@@ -46,7 +46,7 @@ jobs:
             -d '{"messages":[{"role":"user","content":"hola"}]}'
           docker rm -f s
       - name: Escaneo de vulnerabilidades (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: secmcp:ci
           severity: CRITICAL,HIGH
