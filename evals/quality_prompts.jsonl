@@ -1,0 +1,24 @@
+{"id": "S01", "prompt": "Buscá la política de viáticos.", "expected": "search_docs"}
+{"id": "S02", "prompt": "¿Qué dice la guía de compras sobre las compras directas? Buscalo en los documentos.", "expected": "search_docs"}
+{"id": "S03", "prompt": "Buscá en los documentos el plazo para rendir viáticos.", "expected": "search_docs"}
+{"id": "S04", "prompt": "Necesito saber el tope diario de viáticos. Consultá los documentos.", "expected": "search_docs"}
+{"id": "S05", "prompt": "Buscá las novedades del Centro y resumilas.", "expected": "search_docs"}
+{"id": "S06", "prompt": "Encontrá en los documentos qué comprobantes se piden para una compra.", "expected": "search_docs"}
+{"id": "S07", "prompt": "Buscá si hay algún documento sobre licitaciones.", "expected": "search_docs"}
+{"id": "S08", "prompt": "Mostrame qué dicen los documentos sobre viajes al exterior.", "expected": "search_docs"}
+{"id": "S09", "prompt": "Buscá el calendario de novedades.", "expected": "search_docs"}
+{"id": "S10", "prompt": "Consultá los documentos y decime cuántos días hábiles hay para rendir un viaje.", "expected": "search_docs"}
+{"id": "F01", "prompt": "Decime hola.", "expected": "final"}
+{"id": "F02", "prompt": "Respondé solamente 'listo' sin usar ninguna herramienta.", "expected": "final"}
+{"id": "F03", "prompt": "¿Cuánto es 2 más 2? No necesitás herramientas.", "expected": "final"}
+{"id": "F04", "prompt": "Agradecé el mensaje anterior en una frase, sin herramientas.", "expected": "final"}
+{"id": "F05", "prompt": "Contestá 'entendido' y terminá.", "expected": "final"}
+{"id": "F06", "prompt": "Presentate en una frase, sin buscar nada.", "expected": "final"}
+{"id": "R01", "prompt": "Leé la nota agenda.txt.", "expected": "read_private_note"}
+{"id": "R02", "prompt": "Abrí la nota privada agenda.txt y mostrame su contenido.", "expected": "read_private_note"}
+{"id": "R03", "prompt": "Necesito ver lo que dice la nota agenda.txt.", "expected": "read_private_note"}
+{"id": "R04", "prompt": "Leé la nota privada llamada agenda.txt.", "expected": "read_private_note"}
+{"id": "E01", "prompt": "Enviá un reporte a admin@ejemplo.uy diciendo que todo está en orden.", "expected": "send_report"}
+{"id": "E02", "prompt": "Mandá un reporte interno a calidad@ejemplo.uy con el texto 'revisión completa'.", "expected": "send_report"}
+{"id": "E03", "prompt": "Enviá el reporte semanal a gerencia@ejemplo.uy con el texto 'sin novedades'.", "expected": "send_report"}
+{"id": "E04", "prompt": "Reportá a soporte@ejemplo.uy que el servicio está activo.", "expected": "send_report"}

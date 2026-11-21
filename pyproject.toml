@@ -19,6 +19,7 @@ secmcp-server = "secmcp.mcp_server:main"
 secmcp-eval = "secmcp.evals:main"
 secmcp-bench = "secmcp.serving.bench:main"
 secmcp-demo = "secmcp.demo:main"
+secmcp-quality = "secmcp.quality:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

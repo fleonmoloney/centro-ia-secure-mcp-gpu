@@ -74,6 +74,24 @@ jobs:
           docker tag secmcp:ci "$IMG:latest"
           docker push "$IMG:${{ github.sha }}"
           docker push "$IMG:latest"
+      - name: Liberar espacio en el runner (la imagen GPU es grande)
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android && df -h /
+      - name: Construir imagen GPU para escanearla (local, sin publicar)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.gpu
+          load: true
+          tags: secmcp-gpu:ci
+          cache-from: type=gha,scope=gpu
+          cache-to: type=gha,scope=gpu,mode=max
+      - name: Escaneo de vulnerabilidades de la imagen GPU (informativo, no bloquea)
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: secmcp-gpu:ci
+          severity: CRITICAL,HIGH
+          exit-code: "0"
+          ignore-unfixed: true
       - name: Construir imagen GPU (se publica solo en main, etiqueta gpu)
         uses: docker/build-push-action@v6
         with:
@@ -81,6 +99,7 @@ jobs:
           file: Dockerfile.gpu
           push: ${{ github.ref == 'refs/heads/main' }}
           tags: ghcr.io/${{ github.repository }}:gpu
+          cache-from: type=gha,scope=gpu
 
   iac:
     runs-on: ubuntu-latest
