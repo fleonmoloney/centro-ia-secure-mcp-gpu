@@ -2,7 +2,7 @@
 
 Prototipo de referencia que junta cinco cosas que suelen verse por separado: un **servidor MCP**, una **política de flujo** contra inyección de instrucciones y exfiltración, un **servicio de modelos con GPU**, **CI/CD con contenedores** e **infraestructura como código**. Se puede ejecutar gratis en Colab o Kaggle (GPU T4).
 
-Es un prototipo de arquitectura, no un producto. Lo que se verificó y lo que no está abajo, sin adornos.
+Es un prototipo de arquitectura, no un producto. Lo que se verificó y lo que.
 
 ## Qué incluye
 | Pieza | Qué hace | Código |
