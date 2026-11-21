@@ -62,3 +62,51 @@ def test_percentiles():
     for i in range(10):
         m.record(0.1 * (i + 1), 10)
     assert m.snapshot()["latency_p99_s"] >= m.snapshot()["latency_p50_s"]
+
+
+def test_error_de_generacion_se_registra_y_no_filtra_detalle(caplog):
+    class Roto:
+        name = "roto"
+        def info(self): return {}
+        def generate(self, *a): raise RuntimeError("detalle-interno-secreto")
+    c = TestClient(create_app(backend=Roto(), api_key=""))
+    with caplog.at_level("ERROR", logger="secmcp.serving"):
+        r = c.post("/v1/chat/completions", json={"messages": [{"role": "user", "content": "hola"}]})
+    assert r.status_code == 500
+    assert "detalle-interno-secreto" not in r.text
+    assert "detalle-interno-secreto" in caplog.text
+
+
+def test_transformers_generate_tokeniza_aparte_y_pasa_mascara():
+    import contextlib
+    from types import SimpleNamespace
+
+    from secmcp.serving.backends import TransformersBackend
+
+    class Enc(dict):
+        def to(self, _): return self
+    class Ids(list):
+        shape = (1, 3)
+    class Out:
+        def __getitem__(self, k): return SimpleNamespace(shape=(2,), tolist=lambda: [7, 8])
+    seen = {}
+    class Tok:
+        eos_token_id = 0
+        def apply_chat_template(self, m, add_generation_prompt, tokenize):
+            assert tokenize is False
+            return "PROMPT"
+        def __call__(self, text, return_tensors):
+            assert text == "PROMPT"
+            return Enc(input_ids=Ids(), attention_mask=[1])
+        def decode(self, ids, skip_special_tokens): return "ok"
+    class Model:
+        device = "cpu"
+        def generate(self, **kw):
+            seen.update(kw)
+            return Out()
+    b = TransformersBackend.__new__(TransformersBackend)
+    b.tok, b.model = Tok(), Model()
+    b.torch = SimpleNamespace(inference_mode=contextlib.nullcontext)
+    g = b.generate([{"role": "user", "content": "x"}], 16, 0.0)
+    assert g.text == "ok" and g.prompt_tokens == 3 and g.completion_tokens == 2
+    assert "attention_mask" in seen and seen["do_sample"] is False and "temperature" not in seen

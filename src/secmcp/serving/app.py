@@ -6,6 +6,7 @@ Sin batching continuo: para producción real corresponde vLLM o TGI (ver docs/se
 from __future__ import annotations
 
 import hmac
+import logging
 import os
 import threading
 import time
@@ -19,6 +20,7 @@ from pydantic import BaseModel, Field
 from .backends import Backend, make_backend
 from .metrics import Metrics
 
+log = logging.getLogger("secmcp.serving")
 MAX_TOKENS_CAP = int(os.environ.get("MAX_TOKENS_CAP", "512"))
 MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "16000"))
 
@@ -92,7 +94,8 @@ def create_app(backend: Backend | None = None, api_key: str | None = None) -> Fa
         try:
             with app.state.gpu_lock:
                 g = be.generate([m.model_dump() for m in req.messages], max_tokens, req.temperature)
-        except Exception:  # noqa: BLE001 - el detalle no se expone al cliente
+        except Exception:
+            log.exception("fallo de generación")
             app.state.metrics.error()
             raise HTTPException(500, "error de generación") from None
         dt = time.perf_counter() - t0

@@ -76,13 +76,19 @@ class TransformersBackend:
         return d
 
     def generate(self, messages, max_tokens, temperature):
-        ids = self.tok.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt").to(self.model.device)
+        # Se renderiza la plantilla a texto y se tokeniza aparte: así no depende de si
+        # apply_chat_template devuelve un tensor o un BatchEncoding según la versión de transformers.
+        text = self.tok.apply_chat_template(messages, add_generation_prompt=True, tokenize=False)
+        enc = self.tok(text, return_tensors="pt").to(self.model.device)
+        n_in = int(enc["input_ids"].shape[1])
+        gen_kw: dict = {"max_new_tokens": max_tokens, "pad_token_id": self.tok.eos_token_id,
+                        "do_sample": temperature > 0}
+        if temperature > 0:
+            gen_kw["temperature"] = temperature
         with self.torch.inference_mode():
-            out = self.model.generate(
-                ids, max_new_tokens=max_tokens, do_sample=temperature > 0,
-                temperature=temperature or None, pad_token_id=self.tok.eos_token_id)
-        new = out[0, ids.shape[1]:]
-        return Generation(self.tok.decode(new, skip_special_tokens=True), int(ids.shape[1]), int(new.shape[0]))
+            out = self.model.generate(**enc, **gen_kw)
+        new = out[0, n_in:]
+        return Generation(self.tok.decode(new, skip_special_tokens=True), n_in, int(new.shape[0]))
 
 
 def make_backend() -> Backend:
