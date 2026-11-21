@@ -21,7 +21,9 @@ jobs:
         run: python -m secmcp.evals --gate --out results/evals.md
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: evals-${{ matrix.python }}, path: results/evals.md }
+        with:
+          name: "evals-${{ matrix.python }}"
+          path: results/evals.md
 
   image:
     needs: test
@@ -50,13 +52,6 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: "1"
           ignore-unfixed: true
-      - name: Publicar en GHCR (solo main)
-        if: github.ref == 'refs/heads/main'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          IMG=ghcr.io/${{ github.repository }}
-          docker tag secmcp:ci $IMG:${{ github.sha }} && docker tag secmcp:ci $IMG:latest
-          docker push $IMG:${{ github.sha }} && docker push $IMG:latest
       - name: Iniciar sesión en GHCR (solo main)
         if: github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
@@ -64,6 +59,14 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publicar imagen CPU en GHCR (solo main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          IMG=$(echo "ghcr.io/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker tag secmcp:ci "$IMG:${{ github.sha }}"
+          docker tag secmcp:ci "$IMG:latest"
+          docker push "$IMG:${{ github.sha }}"
+          docker push "$IMG:latest"
       - name: Construir imagen GPU (se publica solo en main, etiqueta gpu)
         uses: docker/build-push-action@v6
         with:
