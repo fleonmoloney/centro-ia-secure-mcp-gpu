@@ -48,3 +48,10 @@ def test_compare_md_tabla():
     md = compare_md(res("fp16", 0.9), res("4 bits", 0.8))
     assert "| Medida | fp16 | 4 bits |" in md and "9.5" in md and "—" in md
     json.dumps(res("a", 1))
+
+
+def test_compare_md_avisa_si_falta_la_perplejidad_en_ingles():
+    m = {"k": 1, "rate": 0.5, "lo": 0.1, "hi": 0.9}
+    r = {"quant": "fp16", "gpu_mem_mb": 1, "ppl_en": None, "ppl_en_error": "ConnectionError: x",
+         "ppl_es": {"ppl": 22.0}, "agent": {"n": 24, "valid": m, "expected": m}}
+    assert "no disponible: ConnectionError" in compare_md(r, {**r, "quant": "4 bits"})

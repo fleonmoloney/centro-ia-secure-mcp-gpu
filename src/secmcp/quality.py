@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import sys
 import time
 from pathlib import Path
 
@@ -105,13 +106,11 @@ def spanish_text() -> str:
     return "\n\n".join(p.read_text(encoding="utf-8") for p in sorted(DOCS.glob("*.md")))
 
 
-def english_text() -> str | None:
-    try:
-        from datasets import load_dataset
-        ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
-        return "\n\n".join(ds["text"])
-    except Exception:  # noqa: BLE001 - opcional: sin red o sin `datasets`, se omite
-        return None
+def english_text() -> str:
+    """wikitext-2 (test). Si falla (sin red, sin `datasets`, versiones), la excepción se registra en el resultado."""
+    from datasets import load_dataset
+    ds = load_dataset("Salesforce/wikitext", "wikitext-2-raw-v1", split="test")
+    return "\n\n".join(ds["text"])
 
 
 def compare_md(a: dict, b: dict) -> str:
@@ -130,6 +129,10 @@ def compare_md(a: dict, b: dict) -> str:
     ]
     out = [f"| Medida | {la} | {lb} |", "|---|---|---|"]
     out += [f"| {r[0]} | {r[1]} | {r[2]} |" for r in rows]
+    for r in (a, b):
+        if r.get("ppl_en_error"):
+            out.append(f"\nNota ({r['quant']}): perplejidad en inglés no disponible: {r['ppl_en_error']}")
+            break
     return "\n".join(out)
 
 
@@ -149,8 +152,12 @@ def main() -> None:
     info = be.info()
     res: dict = {"model": a.model, "quant": "fp16" if a.quant == "none" else "4 bits", "gpu": info.get("gpu"),
                  "gpu_mem_mb": info.get("gpu_mem_alloc_mb")}
-    en = english_text()
-    res["ppl_en"] = perplexity(be, en) if en else None
+    try:
+        res["ppl_en"] = perplexity(be, english_text())
+    except Exception as e:  # noqa: BLE001 - es opcional, pero se dice por qué no está
+        res["ppl_en"] = None
+        res["ppl_en_error"] = f"{type(e).__name__}: {e}"[:300]
+        print("AVISO: no se pudo medir la perplejidad en inglés:", res["ppl_en_error"], file=sys.stderr)
     res["ppl_es"] = perplexity(be, spanish_text())
     res["agent"], rows = agent_behaviour(be, load_prompts())
     res["agent_rows"] = rows

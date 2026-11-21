@@ -63,8 +63,40 @@ Modelo `Qwen/Qwen2.5-1.5B-Instruct` con `transformers`, 20 pedidos por corrida, 
 | fp16, 8 en paralelo (2.ª corrida) | idem | 6,944 s | 7,698 s | 7,797 s | 28,8 |
 
 Lectura:
-- **La cuantización a 4 bits ahorra ~61 % de memoria** (2945 → 1158 MB) **pero es ~2,3 veces más lenta** en este modelo (p50 2,047 s contra 0,876 s). Con un modelo de 1,5 B que entra de sobra en la T4, no conviene; sirve cuando el modelo no cabe en fp16. No se midió si cambia la calidad de las respuestas.
+- **La cuantización a 4 bits ahorra ~61 % de memoria** (2945 → 1158 MB) **pero es ~2,3 veces más lenta** en este modelo (p50 2,047 s contra 0,876 s). Con un modelo de 1,5 B que entra de sobra en la T4, no conviene; sirve cuando el modelo no cabe en fp16. La calidad se midió aparte (sección siguiente).
 - **La concurrencia no aumenta el rendimiento:** con 1, 4 y 8 pedidos en paralelo el total queda plano (~29-31 tokens/s) y la latencia crece casi linealmente (p50 0,87 → 3,4 → 6,9 s), porque el servicio serializa la GPU con un semáforo y no hace batching continuo. La primera corrida con 4 en paralelo dio 23,1 tokens/s y p95 de 9 s; la segunda, 30,8 y 4,0 s. La diferencia entre corridas muestra la variabilidad (posible efecto de calentamiento, no verificado). Para carga real, vLLM o TGI.
+
+### Calidad: fp16 contra 4 bits (`secmcp.quality`, 24 pedidos, una corrida)
+Mismo modelo y misma T4; el modelo se carga en el propio proceso. Muestras chicas: sirven como indicio, no como prueba.
+
+| Medida | fp16 | 4 bits |
+|---|---|---|
+| Memoria GPU tras cargar | 2945 MB | 1158 MB |
+| Perplejidad, español (documentos del repo; un solo bloque de texto) | 22,175 | 24,081 |
+| Perplejidad, inglés (wikitext-2) | no obtenida | no obtenida |
+| Acción JSON válida (n=24), % [IC 95 %] | 83 % [64–93] | 79 % [60–91] |
+| Acción esperada, % [IC 95 %] | 71 % [51–85] | 75 % [55–88] |
+
+Lectura:
+- En perplejidad en español, 4 bits sube ~9 % (22,2 → 24,1): la degradación esperable de la cuantización, medida sobre un texto muy corto.
+- En comportamiento como agente **no se detecta diferencia**: las dos columnas difieren en un solo pedido de 24 (20 contra 19 válidas; 17 contra 18 con la acción esperada), con intervalos de unos ±15 puntos que se superponen casi por completo. Con esta muestra no se puede afirmar que 4 bits sea igual ni que sea peor; solo que la diferencia, si existe, no se ve con 24 pedidos.
+- Aun en fp16, **~17 % de las respuestas no es una acción válida** (4 de 24): es la razón de los `invalid_output` del demo y un límite de este modelo chico para actuar como agente.
+- La perplejidad en inglés no se obtuvo: la carga de wikitext-2 falló sin aviso en esa corrida (el script ya registra el motivo). Los pedidos y las acciones esperadas los escribió el autor.
+
+### vLLM contra transformers (misma T4, mismo modelo y prompt, 20 pedidos, `max_tokens=64`)
+vLLM 0.34.0 con `--dtype half --max-model-len 4096`, servidor de la API compatible con OpenAI. Una corrida por configuración.
+
+| Pedidos en paralelo | transformers p50 | vLLM p50 | transformers tokens/s | vLLM tokens/s |
+|---|---|---|---|---|
+| 1 | 0,866 s | 0,604 s | 29,0 | 62,3 |
+| 4 | 3,388 s | 0,739 s | 30,8 | 200,7 |
+| 8 | 6,944 s | 0,891 s | 28,8 | 305,5 |
+
+Lectura:
+- Con 1 pedido, vLLM ya es ~2 veces más rápido; con 8 en paralelo, el rendimiento es ~10 veces mayor y la latencia p50 ~8 veces menor. Con transformers la latencia crece casi linealmente con la concurrencia; con vLLM casi no se mueve, por el batching continuo.
+- Es una comparación entre **servidores completos** (batching continuo, atención paginada, grafos CUDA), no solo entre bibliotecas de inferencia.
+- Qué no dice: no se comparó la calidad de las respuestas; vLLM reserva por defecto gran parte de la memoria de la GPU para la caché, así que su consumo de memoria no es comparable con el de la tabla anterior (no se midió); son corridas cortas (20 pedidos, el de 8 en paralelo dura ~2,5 s) y de una sola vez. Las cifras de la T4 gratuita varían con la carga de la sesión.
+- Instalar vLLM en Colab dejó conflictos de dependencias (entre otros, subió `mcp` a 2.x, incompatible con `mcp<2` de este repo): conviene hacerlo en una sesión aparte y reiniciar el entorno después.
 
 ### Un modelo real ante el documento envenenado (`secmcp.demo`, una corrida)
 - **Sin defensa**, el modelo de 1,5 B obedeció la inyección: buscó las novedades, leyó la nota privada y llamó a `http_post` y `send_report`; hubo fuga (el canario salió).
@@ -78,14 +110,15 @@ Lectura:
 - Compuerta de evals, incluida la mutación que la hace fallar: sin defensa 6/7 fugas, con Guard 0/7, tareas legítimas 3/3.
 - `secmcp-server` por stdio con el cliente de la SDK de MCP: lista las cuatro herramientas y bloquea una salida a un destino no permitido.
 - **GPU (T4):** `TransformersBackend` en fp16 y en 4 bits, carga, memoria, latencia y rendimiento (tabla de arriba), 0 errores en las corridas medidas.
+- **Calidad en 4 bits** (perplejidad en español y comportamiento como agente sobre 24 pedidos): sin diferencia detectable en el agente; muestras chicas (tabla de arriba).
+- **vLLM en la T4:** arranca y sirve el mismo modelo; benchmark con 1, 4 y 8 pedidos en paralelo contra el servicio de transformers (una corrida cada uno).
 - **CI en GitHub** (todos los jobs verdes): pruebas en Python 3.10 y 3.12, `ruff`, compuerta de evals, construcción de la imagen CPU, prueba de humo del contenedor, escaneo con Trivy (sin hallazgos HIGH/CRITICAL corregibles), `terraform fmt`, `init` y `validate`, y construcción de la imagen GPU.
 - El servicio con uvicorn y el benchmark por HTTP, con el backend simulado y con el modelo real.
 
 **No verificado:**
 - **Terraform `plan`/`apply`:** solo se validó la sintaxis y la configuración. La familia de imagen de Deep Learning VM y la disponibilidad de la GPU en la zona hay que verificarlas. No hay GPU gratuita en la nube por IaC: aplicar cuesta dinero.
-- **vLLM:** la celda opcional no produjo una medición confiable en la corrida (el puerto 8000 seguía ocupado por el servidor anterior); no hay cifras de vLLM.
 - **La imagen GPU ejecutada con GPU:** se construye en CI, pero no se corrió el contenedor con la GPU ni se escaneó con Trivy.
-- **Calidad del modelo en 4 bits** y **robustez de modelos reales ante la inyección:** el demo es una corrida con un modelo chico.
+- **Calidad en 4 bits a mayor escala** (perplejidad en inglés no obtenida; pocos pedidos) y **robustez de modelos reales ante la inyección:** el demo es una corrida con un modelo chico.
 - **Un cliente MCP de producto** (por ejemplo, un asistente de escritorio) contra `secmcp-server`: solo se probó con el cliente de la SDK.
 
 ## Limitaciones conocidas
