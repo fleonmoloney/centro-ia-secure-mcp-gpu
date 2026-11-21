@@ -21,6 +21,11 @@ from .backends import Backend, make_backend
 from .metrics import Metrics
 
 log = logging.getLogger("secmcp.serving")
+if not log.handlers:  # uvicorn solo configura sus propios loggers; sin esto el traceback podía perderse
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(levelname)s [secmcp] %(message)s"))
+    log.addHandler(_h)
+    log.setLevel(logging.INFO)
 MAX_TOKENS_CAP = int(os.environ.get("MAX_TOKENS_CAP", "512"))
 MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "16000"))
 
