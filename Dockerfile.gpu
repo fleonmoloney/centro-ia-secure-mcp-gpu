@@ -1,0 +1,13 @@
+# Imagen GPU: transformers sobre CUDA. Requiere el NVIDIA Container Toolkit en el host
+# (docker run --gpus all ...). No se construyó ni probó en el entorno de desarrollo (sin GPU ni daemon).
+FROM pytorch/pytorch:2.4.0-cuda12.1-cudnn9-runtime
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 HF_HOME=/models
+WORKDIR /app
+COPY pyproject.toml ./
+COPY src ./src
+COPY data ./data
+RUN pip install ".[gpu]" && useradd --system --uid 10001 app && mkdir -p /models && chown -R app /app /models
+USER app
+ENV BACKEND=transformers MODEL_ID=Qwen/Qwen2.5-1.5B-Instruct QUANT=none SECMCP_DATA=/app/data
+EXPOSE 8000
+CMD ["uvicorn", "secmcp.serving.app:app_factory", "--factory", "--host", "0.0.0.0", "--port", "8000"]

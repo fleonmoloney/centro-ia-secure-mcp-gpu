@@ -1,0 +1,4 @@
+project_id    = "mi-proyecto"
+image         = "ghcr.io/USUARIO/centro-ia-secure-mcp-gpu:gpu"
+serve_api_key = "cambiar"
+allowed_cidrs = ["203.0.113.4/32"]

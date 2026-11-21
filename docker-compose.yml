@@ -1,0 +1,26 @@
+services:
+  serving-cpu:            # backend simulado, sin GPU: docker compose up serving-cpu
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      SERVE_API_KEY: ${SERVE_API_KEY:-}
+  serving-gpu:            # docker compose --profile gpu up serving-gpu (necesita NVIDIA Container Toolkit)
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    ports: ["8001:8000"]
+    environment:
+      SERVE_API_KEY: ${SERVE_API_KEY:-}
+      MODEL_ID: ${MODEL_ID:-Qwen/Qwen2.5-1.5B-Instruct}
+      QUANT: ${QUANT:-none}
+    volumes: ["models:/models"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+volumes:
+  models: {}

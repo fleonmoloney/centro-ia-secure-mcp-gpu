@@ -1,0 +1,82 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { python: ["3.10", "3.12"] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python }}" }
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest -q
+      - name: Compuerta de evals adversariales
+        run: python -m secmcp.evals --gate --out results/evals.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: evals-${{ matrix.python }}, path: results/evals.md }
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir imagen CPU
+        uses: docker/build-push-action@v6
+        with: { context: ., load: true, tags: "secmcp:ci" }
+      - name: Prueba de humo del contenedor
+        run: |
+          docker run -d --name s -p 8000:8000 secmcp:ci
+          for i in $(seq 1 20); do curl -fs localhost:8000/readyz && break || sleep 1; done
+          curl -fs -X POST localhost:8000/v1/chat/completions -H 'content-type: application/json' \
+            -d '{"messages":[{"role":"user","content":"hola"}]}'
+          docker rm -f s
+      - name: Escaneo de vulnerabilidades (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: secmcp:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: Publicar en GHCR (solo main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          IMG=ghcr.io/${{ github.repository }}
+          docker tag secmcp:ci $IMG:${{ github.sha }} && docker tag secmcp:ci $IMG:latest
+          docker push $IMG:${{ github.sha }} && docker push $IMG:latest
+      - name: Iniciar sesión en GHCR (solo main)
+        if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Construir imagen GPU (se publica solo en main, etiqueta gpu)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.gpu
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ghcr.io/${{ github.repository }}:gpu
+
+  iac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform fmt -check -recursive
+      - run: terraform -chdir=infra/terraform init -backend=false
+      - run: terraform -chdir=infra/terraform validate

@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secmcp"
+version = "0.1.0"
+description = "Servidor MCP con defensas contra inyección de instrucciones y exfiltración, y servicio de modelos con GPU (prototipo de referencia)"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["pydantic>=2", "httpx>=0.27", "fastapi>=0.110", "uvicorn>=0.29", "mcp>=1.2,<2"]
+
+[project.optional-dependencies]
+gpu = ["torch", "transformers>=4.44", "accelerate", "bitsandbytes"]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.scripts]
+secmcp-server = "secmcp.mcp_server:main"
+secmcp-eval = "secmcp.evals:main"
+secmcp-bench = "secmcp.serving.bench:main"
+secmcp-demo = "secmcp.demo:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["notebooks"]
