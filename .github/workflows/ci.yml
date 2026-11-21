@@ -40,11 +40,18 @@ jobs:
         with: { context: ., load: true, tags: "secmcp:ci" }
       - name: Prueba de humo del contenedor
         run: |
-          docker run -d --name s -p 8000:8000 secmcp:ci
-          for i in $(seq 1 20); do curl -fs localhost:8000/readyz && break || sleep 1; done
+          docker run -d --name secmcp-smoke -p 8000:8000 -e BACKEND=mock secmcp:ci
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fs localhost:8000/readyz; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then docker logs secmcp-smoke; exit 1; fi
           curl -fs -X POST localhost:8000/v1/chat/completions -H 'content-type: application/json' \
             -d '{"messages":[{"role":"user","content":"hola"}]}'
-          docker rm -f s
+      - name: Limpiar contenedor de la prueba
+        if: always()
+        run: docker rm -f secmcp-smoke || true
       - name: Escaneo de vulnerabilidades (Trivy)
         uses: aquasecurity/trivy-action@v0.35.0
         with:
