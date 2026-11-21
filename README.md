@@ -2,7 +2,7 @@
 
 Prototipo de referencia que junta cinco cosas que suelen verse por separado: un **servidor MCP**, una **política de flujo** contra inyección de instrucciones y exfiltración, un **servicio de modelos con GPU**, **CI/CD con contenedores** e **infraestructura como código**. Se puede ejecutar gratis en Colab o Kaggle (GPU T4).
 
-Es un prototipo de arquitectura, no un producto. Lo que se verificó y lo que no.
+Es un prototipo de arquitectura, no un producto. Lo que se verificó y lo que no está abajo, sin adornos.
 
 ## Qué incluye
 | Pieza | Qué hace | Código |
@@ -38,7 +38,7 @@ Qué dicen y qué no:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest -q                             # 34 pruebas, sin red, sin GPU, sin claves
+pytest -q                             # 36 pruebas, sin red, sin GPU, sin claves
 python -m secmcp.evals --gate         # compuerta de evals adversariales
 
 # servicio con backend simulado
@@ -50,20 +50,39 @@ secmcp-server
 ```
 Con GPU gratuita: abrí `notebooks/colab_gpu.ipynb` en Colab (GPU T4) o Kaggle. Con Docker: `docker compose up serving-cpu`, o `docker compose --profile gpu up serving-gpu` en un host con NVIDIA Container Toolkit.
 
+## Resultados en GPU (Colab, Tesla T4 de 15 GB, 21/11/2026)
+Modelo `Qwen/Qwen2.5-1.5B-Instruct` con `transformers`, 20 pedidos por corrida, `max_tokens=64`, `temperature=0`. Una sola corrida por configuración: orientan, no son un benchmark de referencia. La salida completa está en el notebook ejecutado.
+
+| Configuración | Memoria GPU tras cargar | p50 | p95 | p99 | tokens/s |
+|---|---|---|---|---|---|
+| fp16, 1 pedido a la vez | 2945 MB | 0,876 s | 1,123 s | 1,172 s | 29,7 |
+| fp16, 4 en paralelo | 2945 MB | 3,759 s | 9,043 s | 9,118 s | 23,1 |
+| 4 bits (bitsandbytes), 1 a la vez | 1158 MB | 2,047 s | 2,627 s | 2,684 s | 15,4 |
+
+Lectura:
+- **La cuantización a 4 bits ahorra ~61 % de memoria** (2945 → 1158 MB) **pero es ~2,3 veces más lenta** en este modelo (p50 2,047 s contra 0,876 s). Con un modelo de 1,5 B que entra de sobra en la T4, no conviene; sirve cuando el modelo no cabe en fp16. No se midió si cambia la calidad de las respuestas.
+- **La concurrencia no ayuda:** con 4 pedidos en paralelo sube la latencia y baja el rendimiento total (23,1 contra 29,7 tokens/s). Es lo esperable: el servicio serializa la GPU con un semáforo y no hace batching continuo. Para carga real, vLLM o TGI.
+
+### Un modelo real ante el documento envenenado (`secmcp.demo`, una corrida)
+- **Sin defensa**, el modelo de 1,5 B obedeció la inyección: buscó las novedades, leyó la nota privada y llamó a `http_post` y `send_report`; hubo fuga (el canario salió).
+- **Con Guard**, el documento quedó marcado y la corrida terminó sin fuga, **pero por `invalid_output`** (el modelo no emitió una acción válida tras el documento), no porque la política bloqueara un intento del modelo. Esta corrida no demuestra el bloqueo con un modelo real; ese bloqueo está demostrado en la compuerta determinista de evals, con un modelo guionado que obedece siempre.
+- Con una herramienta inexistente (`calendar_novelties`), el Guard la rechazó con `default-deny`.
+- Es una corrida con un modelo chico: no mide la tasa de obediencia ni la robustez de ningún modelo.
+
 ## Qué se verificó y qué no
-**Verificado** (en el entorno de desarrollo, sin GPU):
-- 34 pruebas y `ruff`: política, escáneres, Guard, agente, servicio, métricas y el servidor MCP con un cliente MCP en memoria.
-- Compuerta de evals, incluida la mutación que la hace fallar.
-- `secmcp-server` levantado por stdio y consultado con el cliente stdio de la SDK de MCP: lista las cuatro herramientas y bloquea una salida a un destino no permitido.
-- El servicio levantado con uvicorn y el benchmark por HTTP, con el backend simulado.
-- Sintaxis HCL de los archivos de Terraform (con un parser, no con Terraform).
+**Verificado:**
+- 36 pruebas y `ruff`: política, escáneres, Guard, agente, servicio, métricas y servidor MCP con un cliente en memoria; también pasan en Colab.
+- Compuerta de evals, incluida la mutación que la hace fallar: sin defensa 6/7 fugas, con Guard 0/7, tareas legítimas 3/3.
+- `secmcp-server` por stdio con el cliente de la SDK de MCP: lista las cuatro herramientas y bloquea una salida a un destino no permitido.
+- **GPU (T4):** `TransformersBackend` en fp16 y en 4 bits, carga, memoria, latencia y rendimiento (tabla de arriba), 0 errores en las corridas medidas.
+- **CI en GitHub** (todos los jobs verdes): pruebas en Python 3.10 y 3.12, `ruff`, compuerta de evals, construcción de la imagen CPU, prueba de humo del contenedor, escaneo con Trivy (sin hallazgos HIGH/CRITICAL corregibles), `terraform fmt`, `init` y `validate`, y construcción de la imagen GPU.
+- El servicio con uvicorn y el benchmark por HTTP, con el backend simulado y con el modelo real.
 
 **No verificado:**
-- **GPU.** `TransformersBackend`, la cuantización de 4 bits y el notebook no se ejecutaron en una GPU real. Hay que correr el notebook y pegar la salida aquí, sin editarla. Hoy no hay cifras de latencia ni de memoria de GPU.
-- **Docker.** No había daemon: ni `Dockerfile` ni `Dockerfile.gpu` se construyeron.
-- **Terraform.** No se ejecutó `terraform validate` ni `plan` ni `apply` (el binario no se pudo descargar). La familia de imagen de Deep Learning VM y la disponibilidad de la GPU en la zona hay que verificarlas. No hay GPU gratuita en la nube por IaC: esto cuesta dinero si se aplica.
-- **CI.** El workflow nunca corrió en GitHub. Trivy puede reportar vulnerabilidades de las imágenes base y fallar el job; `terraform fmt -check` puede pedir reformatear.
-- **Un modelo real ante la inyección.** `secmcp.demo` lo muestra, pero un modelo chico puede no emitir JSON válido ni obedecer el ataque; el resultado depende del modelo.
+- **Terraform `plan`/`apply`:** solo se validó la sintaxis y la configuración. La familia de imagen de Deep Learning VM y la disponibilidad de la GPU en la zona hay que verificarlas. No hay GPU gratuita en la nube por IaC: aplicar cuesta dinero.
+- **vLLM:** la celda opcional no produjo una medición confiable en la corrida (el puerto 8000 seguía ocupado por el servidor anterior); no hay cifras de vLLM.
+- **La imagen GPU ejecutada con GPU:** se construye en CI, pero no se corrió el contenedor con la GPU ni se escaneó con Trivy.
+- **Calidad del modelo en 4 bits** y **robustez de modelos reales ante la inyección:** el demo es una corrida con un modelo chico.
 - **Un cliente MCP de producto** (por ejemplo, un asistente de escritorio) contra `secmcp-server`: solo se probó con el cliente de la SDK.
 
 ## Limitaciones conocidas
@@ -78,7 +97,7 @@ Con GPU gratuita: abrí `notebooks/colab_gpu.ipynb` en Colab (GPU T4) o Kaggle. 
 ```
 src/secmcp/   scanners · policy · guard · tools · agent · llm · mcp_server · evals · demo · serving/
 evals/        attacks.jsonl
-tests/        34 pruebas (pytest)
+tests/        36 pruebas (pytest)
 infra/        terraform (GCP, VM spot con GPU)
 notebooks/    colab_gpu.ipynb
 docs/         threat_model.md · serving.md
