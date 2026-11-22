@@ -38,7 +38,7 @@ Qué dicen y qué no:
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest -q                             # 36 pruebas, sin red, sin GPU, sin claves
+pytest -q                             # 43 pruebas, sin red, sin GPU, sin claves
 python -m secmcp.evals --gate         # compuerta de evals adversariales
 
 # servicio con backend simulado
@@ -48,6 +48,12 @@ python -m secmcp.serving.bench -n 20 -c 4
 # servidor MCP por stdio (por ejemplo, desde un cliente MCP)
 secmcp-server
 ```
+En **Windows (cmd)**: activar con `.venv\Scripts\activate.bat`, y la variable de entorno se define aparte:
+```
+set BACKEND=mock
+uvicorn secmcp.serving.app:app_factory --factory --port 8000
+```
+(en PowerShell: `$env:BACKEND="mock"`).
 Con GPU gratuita: abrí `notebooks/colab_gpu.ipynb` en Colab (GPU T4) o Kaggle. Con Docker: `docker compose up serving-cpu`, o `docker compose --profile gpu up serving-gpu` en un host con NVIDIA Container Toolkit.
 
 ## Resultados en GPU (Colab, Tesla T4 de 15 GB, 21/11/2026)
@@ -106,12 +112,13 @@ Lectura:
 
 ## Qué se verificó y qué no
 **Verificado:**
-- 36 pruebas y `ruff`: política, escáneres, Guard, agente, servicio, métricas y servidor MCP con un cliente en memoria; también pasan en Colab.
+- 43 pruebas y `ruff` (en CI): política, escáneres, Guard, agente, servicio, métricas, calidad y servidor MCP con un cliente en memoria. En Colab pasaron 36 el 21/11/2026, antes de agregar las de `secmcp.quality`.
 - Compuerta de evals, incluida la mutación que la hace fallar: sin defensa 6/7 fugas, con Guard 0/7, tareas legítimas 3/3.
 - `secmcp-server` por stdio con el cliente de la SDK de MCP: lista las cuatro herramientas y bloquea una salida a un destino no permitido.
 - **GPU (T4):** `TransformersBackend` en fp16 y en 4 bits, carga, memoria, latencia y rendimiento (tabla de arriba), 0 errores en las corridas medidas.
 - **Calidad en 4 bits** (perplejidad en español y comportamiento como agente sobre 24 pedidos): sin diferencia detectable en el agente; muestras chicas (tabla de arriba).
 - **Terraform `plan`** contra GCP real (21/11/2026, proyecto de prueba, credenciales reales): `Plan: 3 to add, 0 to change, 0 to destroy` (cuenta de servicio, regla de firewall y VM spot con T4). No se aplicó; `plan` no comprueba cuotas ni disponibilidad.
+- **Windows** (cmd, entorno virtual de Python): el servicio con backend simulado (`/healthz`, `/readyz`) y el benchmark por HTTP contra él (20 pedidos, 4 en paralelo: p50 0,049 s; cifras del backend simulado, no de un modelo).
 - **vLLM en la T4:** arranca y sirve el mismo modelo; benchmark con 1, 4 y 8 pedidos en paralelo contra el servicio de transformers (una corrida cada uno).
 - **CI en GitHub** (todos los jobs verdes): pruebas en Python 3.10 y 3.12, `ruff`, compuerta de evals, construcción de la imagen CPU, prueba de humo del contenedor, escaneo con Trivy (sin hallazgos HIGH/CRITICAL corregibles), `terraform fmt`, `init` y `validate`, y construcción de la imagen GPU.
 - El servicio con uvicorn y el benchmark por HTTP, con el backend simulado y con el modelo real.
@@ -134,7 +141,7 @@ Lectura:
 ```
 src/secmcp/   scanners · policy · guard · tools · agent · llm · mcp_server · evals · demo · serving/
 evals/        attacks.jsonl
-tests/        36 pruebas (pytest)
+tests/        43 pruebas (pytest)
 infra/        terraform (GCP, VM spot con GPU)
 notebooks/    colab_gpu.ipynb
 docs/         threat_model.md · serving.md
