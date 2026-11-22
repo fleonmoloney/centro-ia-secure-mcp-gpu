@@ -42,7 +42,7 @@ class TransformersBackend:
     """Hugging Face transformers en GPU (fp16) o con cuantización de 4 bits (bitsandbytes).
 
     Variables: MODEL_ID (por defecto Qwen/Qwen2.5-1.5B-Instruct), QUANT=none|4bit.
-    No está probado en este repositorio contra una GPU real salvo por el notebook de Colab."""
+    Probado en una T4 de Colab (fp16 y 4 bits) con el notebook del repositorio; ver el README."""
     name = "transformers"
 
     def __init__(self, model_id: str | None = None, quant: str | None = None):
