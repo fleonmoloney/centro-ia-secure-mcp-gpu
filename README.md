@@ -115,6 +115,7 @@ Lectura:
 - 43 pruebas y `ruff` (en CI): política, escáneres, Guard, agente, servicio, métricas, calidad y servidor MCP con un cliente en memoria. En Colab pasaron 36 el 21/11/2026, antes de agregar las de `secmcp.quality`.
 - Compuerta de evals, incluida la mutación que la hace fallar: sin defensa 6/7 fugas, con Guard 0/7, tareas legítimas 3/3.
 - `secmcp-server` por stdio con el cliente de la SDK de MCP: lista las cuatro herramientas y bloquea una salida a un destino no permitido.
+- **`secmcp-server` con MCP Inspector** (cliente de referencia de MCP, v2.16, Windows, 22/11/2026): descubre las cuatro herramientas; `search_docs` devuelve la política; `send_report` se bloquea a un destino fuera de la lista blanca y ante un canario en el cuerpo; `read_private_note` rechaza un recorrido de rutas; y en una sesión que leyó contenido no confiable y luego una nota privada, `send_report` a un destino permitido con un cuerpo inocente se bloquea con `BLOQUEADO (lethal-trifecta): la sesión tiene datos privados y contenido no confiable`.
 - **GPU (T4):** `TransformersBackend` en fp16 y en 4 bits, carga, memoria, latencia y rendimiento (tabla de arriba), 0 errores en las corridas medidas.
 - **Calidad en 4 bits** (perplejidad en español y comportamiento como agente sobre 24 pedidos): sin diferencia detectable en el agente; muestras chicas (tabla de arriba).
 - **Terraform `plan`** contra GCP real (21/11/2026, proyecto de prueba, credenciales reales): `Plan: 3 to add, 0 to change, 0 to destroy` (cuenta de servicio, regla de firewall y VM spot con T4). No se aplicó; `plan` no comprueba cuotas ni disponibilidad.
@@ -127,7 +128,7 @@ Lectura:
 - **Terraform `apply`:** no se ejecutó. Cuesta dinero (no hay GPU gratuita en la nube) y es lo que detectaría los problemas que `plan` no ve: cuota de GPU, disponibilidad de la T4 en la zona y vigencia de la familia de imagen de Deep Learning VM (`common-cu124-ubuntu-2204`). Tampoco se verificó el script de arranque de la VM ni que el contenedor GPU corra en ella.
 - **La imagen GPU ejecutada con GPU:** se construye en CI, pero no se corrió el contenedor con la GPU ni se escaneó con Trivy.
 - **Calidad en 4 bits a mayor escala** (perplejidad en inglés no obtenida; pocos pedidos) y **robustez de modelos reales ante la inyección:** el demo es una corrida con un modelo chico.
-- **Un cliente MCP de producto** (por ejemplo, un asistente de escritorio) contra `secmcp-server`: solo se probó con el cliente de la SDK.
+- **Un asistente de producto** (por ejemplo, Claude Desktop) contra `secmcp-server`: se probó con la SDK de MCP y con MCP Inspector, no con un asistente real que decida solo qué herramientas llamar.
 
 ## Limitaciones conocidas
 - El Guard tiene una sesión por proceso: con varios clientes concurrentes hace falta una sesión por conexión.
