@@ -118,7 +118,7 @@ Lectura:
 - **GPU (T4):** `TransformersBackend` en fp16 y en 4 bits, carga, memoria, latencia y rendimiento (tabla de arriba), 0 errores en las corridas medidas.
 - **Calidad en 4 bits** (perplejidad en español y comportamiento como agente sobre 24 pedidos): sin diferencia detectable en el agente; muestras chicas (tabla de arriba).
 - **Terraform `plan`** contra GCP real (21/11/2026, proyecto de prueba, credenciales reales): `Plan: 3 to add, 0 to change, 0 to destroy` (cuenta de servicio, regla de firewall y VM spot con T4). No se aplicó; `plan` no comprueba cuotas ni disponibilidad.
-- **Windows** (cmd, entorno virtual de Python): el servicio con backend simulado (`/healthz`, `/readyz`) y el benchmark por HTTP contra él (20 pedidos, 4 en paralelo: p50 0,049 s; cifras del backend simulado, no de un modelo).
+- **Windows** (cmd, entorno virtual de Python): las 43 pruebas pasan, y el servicio con backend simulado (`/healthz`, `/readyz`) y el benchmark por HTTP contra él (20 pedidos, 4 en paralelo: p50 0,049 s; cifras del backend simulado, no de un modelo).
 - **vLLM en la T4:** arranca y sirve el mismo modelo; benchmark con 1, 4 y 8 pedidos en paralelo contra el servicio de transformers (una corrida cada uno).
 - **CI en GitHub** (todos los jobs verdes): pruebas en Python 3.10 y 3.12, `ruff`, compuerta de evals, construcción de la imagen CPU, prueba de humo del contenedor, escaneo con Trivy (sin hallazgos HIGH/CRITICAL corregibles), `terraform fmt`, `init` y `validate`, y construcción de la imagen GPU.
 - El servicio con uvicorn y el benchmark por HTTP, con el backend simulado y con el modelo real.
