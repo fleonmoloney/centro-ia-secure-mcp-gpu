@@ -111,12 +111,13 @@ Lectura:
 - `secmcp-server` por stdio con el cliente de la SDK de MCP: lista las cuatro herramientas y bloquea una salida a un destino no permitido.
 - **GPU (T4):** `TransformersBackend` en fp16 y en 4 bits, carga, memoria, latencia y rendimiento (tabla de arriba), 0 errores en las corridas medidas.
 - **Calidad en 4 bits** (perplejidad en español y comportamiento como agente sobre 24 pedidos): sin diferencia detectable en el agente; muestras chicas (tabla de arriba).
+- **Terraform `plan`** contra GCP real (21/11/2026, proyecto de prueba, credenciales reales): `Plan: 3 to add, 0 to change, 0 to destroy` (cuenta de servicio, regla de firewall y VM spot con T4). No se aplicó; `plan` no comprueba cuotas ni disponibilidad.
 - **vLLM en la T4:** arranca y sirve el mismo modelo; benchmark con 1, 4 y 8 pedidos en paralelo contra el servicio de transformers (una corrida cada uno).
 - **CI en GitHub** (todos los jobs verdes): pruebas en Python 3.10 y 3.12, `ruff`, compuerta de evals, construcción de la imagen CPU, prueba de humo del contenedor, escaneo con Trivy (sin hallazgos HIGH/CRITICAL corregibles), `terraform fmt`, `init` y `validate`, y construcción de la imagen GPU.
 - El servicio con uvicorn y el benchmark por HTTP, con el backend simulado y con el modelo real.
 
 **No verificado:**
-- **Terraform `plan`/`apply`:** solo se validó la sintaxis y la configuración. La familia de imagen de Deep Learning VM y la disponibilidad de la GPU en la zona hay que verificarlas. No hay GPU gratuita en la nube por IaC: aplicar cuesta dinero.
+- **Terraform `apply`:** no se ejecutó. Cuesta dinero (no hay GPU gratuita en la nube) y es lo que detectaría los problemas que `plan` no ve: cuota de GPU, disponibilidad de la T4 en la zona y vigencia de la familia de imagen de Deep Learning VM (`common-cu124-ubuntu-2204`). Tampoco se verificó el script de arranque de la VM ni que el contenedor GPU corra en ella.
 - **La imagen GPU ejecutada con GPU:** se construye en CI, pero no se corrió el contenedor con la GPU ni se escaneó con Trivy.
 - **Calidad en 4 bits a mayor escala** (perplejidad en inglés no obtenida; pocos pedidos) y **robustez de modelos reales ante la inyección:** el demo es una corrida con un modelo chico.
 - **Un cliente MCP de producto** (por ejemplo, un asistente de escritorio) contra `secmcp-server`: solo se probó con el cliente de la SDK.
